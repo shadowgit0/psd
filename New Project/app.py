@@ -1,6 +1,7 @@
 import os
-import subprocess
 from flask import Flask, request, jsonify
+from PIL import Image
+import psd_tools
 
 app = Flask(__name__)
 
@@ -11,44 +12,26 @@ def upload_file():
     photo_path = os.path.join('static', photo.filename)
     photo.save(photo_path)
 
-    # Update PSD File using Photoshop Script
-    psd_script = f"""
-    var psdFile = new File("{os.path.abspath('static/your_image.psd')}");
-    var jpgOutput = "{os.path.abspath('static')}/output.jpg";
-    var nameText = "{name}";
-    var photoFile = new File("{os.path.abspath(photo_path)}");
+    psd_path = os.path.join('static', 'your_image.psd')
+    psd = psd_tools.PSDImage.open(psd_path)
 
-    app.open(psdFile);
+    # Replace text
+    for layer in psd.descendants():
+        if layer.kind == 'type' and 'name_layer' in layer.name:
+            layer.text = name
 
-    // Update text layer
-    var textLayer = app.activeDocument.artLayers.getByName("name_layer");
-    textLayer.textItem.contents = nameText;
+    # Replace image
+    for layer in psd.descendants():
+        if layer.kind == 'smartobject' and 'photo_layer' in layer.name:
+            with Image.open(photo_path) as img:
+                img = img.resize(layer.size, Image.ANTIALIAS)
+                layer.image = psd_tools.user_api.pil_io.encode_as_PIL(img)
 
-    // Update photo layer
-    var photoLayer = app.activeDocument.artLayers.getByName("photo_layer");
-    app.open(photoFile);
-    var photoDoc = app.activeDocument;
-    photoDoc.selection.selectAll();
-    photoDoc.selection.copy();
-    app.activeDocument.close(SaveOptions.DONOTSAVECHANGES);
-    app.activeDocument = app.documents.getByName("your_image.psd");
-    photoLayer.kind = LayerKind.SMARTOBJECT;
-    photoLayer.smartObject.resizeContent();
-    app.activeDocument.paste();
+    # Save as JPG
+    jpg_output = os.path.join('static', 'output.jpg')
+    psd.composite().save(jpg_output)
 
-    // Save as JPG
-    var jpgSaveOptions = new JPEGSaveOptions();
-    jpgSaveOptions.quality = 12;
-    app.activeDocument.saveAs(new File(jpgOutput), jpgSaveOptions, true, Extension.LOWERCASE);
-    app.activeDocument.close(SaveOptions.DONOTSAVECHANGES);
-    """.strip()
-
-    with open('update_psd.jsx', 'w') as f:
-        f.write(psd_script)
-
-    subprocess.run(['osascript', '-e', 'tell application "Adobe Photoshop" to do javascript file POSIX file "{os.path.abspath("update_psd.jsx")}"'])
-
-    response = {'success': True, 'imagePath': f'static/output.jpg'}
+    response = {'success': True, 'imagePath': jpg_output}
     return jsonify(response)
 
 if __name__ == "__main__":
