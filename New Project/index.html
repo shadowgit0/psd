@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            text-align: center;
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input[type="file"] {
+            margin-top: 10px;
+        }
+        .progress {
+            width: 100%;
+            background: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        .progress-bar {
+            height: 20px;
+            width: 0;
+            background: #3b82f6;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Upload Form</h2>
+        <form id="uploadForm">
+            <input type="text" name="name" placeholder="Enter your name" required><br>
+            <input type="file" name="photo" accept="image/*" required><br><br>
+            <button type="submit">Upload</button>
+        </form>
+        <div class="progress" style="display: none;">
+            <div class="progress-bar"></div>
+        </div>
+        <div id="uploadedImage" style="display: none;">
+            <h3>Uploaded Image</h3>
+            <img id="imageDisplay" src="" alt="Uploaded Image"><br>
+            <a id="downloadLink" href="" download>Download Image</a>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', function (e) {
+                const percent = e.loaded / e.total * 100;
+                document.querySelector('.progress').style.display = 'block';
+                document.querySelector('.progress-bar').style.width = percent + '%';
+                document.querySelector('.progress-bar').textContent = Math.round(percent) + '%';
+            });
+
+            xhr.addEventListener('load', function () {
+                const response = JSON.parse(this.responseText);
+                if (response.success) {
+                    document.getElementById('uploadedImage').style.display = 'block';
+                    document.getElementById('imageDisplay').src = response.imagePath;
+                    document.getElementById('downloadLink').href = response.imagePath;
+                }
+            });
+
+            xhr.open('POST', '/upload');
+            xhr.send(formData);
+        });
+    </script>
+</body>
+</html>
